@@ -1,4 +1,1615 @@
 
+# LISP
+### Setup 
+
+CSR1000v:
+  Name: R1 UTM-PH
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet3 |
+
+
+CSR1000v:
+  Name: R2 UTM-JP
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet4 |
+
+
+CSR1000v:
+  Name: R3 UTM-US
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet5 |
+  
+
+TinyCore (yvm.ova):
+  Name: P1 BLDG-PH
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet3             |
+
+
+TinyCore (yvm.ova):
+  Name: P2 BLDG-JP
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet4             |
+  
+
+TinyCore (yvm.ova):
+  Name: P3 BLDG-US
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet5             |
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### PRECONFIGS
+
+~~~
+!@UTM-PH
+conf t
+ hostname UTM-PH
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G1
+ ip name-server 8.8.8.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.11 255.255.255.0
+  no shut
+ int g2
+  ip add 192.168.102.11 255.255.255.0
+  no shut
+ int g3
+  ip add 10.11.11.113 255.255.255.224
+  no shut
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@UTM-JP
+conf t
+ hostname UTM-JP
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G1
+ ip name-server 8.8.8.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.12 255.255.255.0
+  no shut
+ int g2
+  ip add 192.168.102.12 255.255.255.0
+  no shut
+ int g3
+  ip add 10.21.21.213 255.255.255.240
+  no shut
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@UTM-US
+conf t
+ hostname UTM-US
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G1
+ ip name-server 8.8.8.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.13 255.255.255.0
+  no shut
+ int g2
+  ip add 192.168.102.13 255.255.255.0
+  no shut
+ int g3
+  ip add 10.0.0.2 255.255.255.252
+  no shut
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@BLDG-PH
+sudo su
+hostname BLDG-PH
+ifconfig eth0 10.11.11.101 netmask 255.255.255.224 up
+route add default gw 10.11.11.113
+ping 10.11.11.113
+~~~
+
+<br>
+
+~~~
+!@BLDG-JP
+sudo su
+hostname BLDG-JP
+ifconfig eth0 10.21.21.211 netmask 255.255.255.240 up
+route add default gw 10.21.21.213
+ping 10.21.21.213
+~~~
+
+<br>
+
+~~~
+!@BLDG-US
+sudo su
+hostname BLDG-US
+ifconfig eth0 10.0.0.1 netmask 255.255.255.252 up
+route add default gw 10.0.0.2
+ping 10.0.0.2
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+## LISP
+
+- EID : Endpoint Identifier 
+- Map Resolver/Server
+- RLOC : Network where Sites Communicates via LISP 
+- ITR : Points IP address for Map Resolver   ! ITR + ETR = XTR
+- ETR : Register EID to Map Server
+- ITR & ETR : If a packet has a source IP from it's database-mapping, it acts as an ITR
+
+
+| EID              | RLOC       | 
+| ---              | ---        |
+| 10.11.11.96  /27 | 208.8.8.11 |
+| 10.21.21.208 /28 | 208.8.8.12 |
+| 10.0.0.0     /30 | 208.8.8.13 |
+
+
+__Map Resolver /Map Server__
+~~~
+!@UTM-US / HQ
+conf t
+ router lisp 1
+  ipv4 map-server
+  ipv4 map-resolver
+ !
+  site PH
+   eid-prefix 10.11.11.96/27
+   authentication-key C1sc0123
+ !
+  site JP
+   eid-prefix 10.21.21.208/28
+   authentication-key C1sc0123
+ !
+  locator-table default
+  end
+show lisp 1 site summary
+sh lisp 1 site rloc members
+~~~
+
+
+__XTR__
+~~~
+!@UTM-PH 
+conf t
+ router lisp 1
+  ipv4 itr
+  ipv4 etr
+  ipv4 itr map-resolver 208.8.8.13
+  ipv4 etr map-server 208.8.8.13 key C1sc0123
+  locator-table default
+  locator-set RLOCS
+   ipv4-interface g1 priority 100 weight 100
+  !
+  eid-table default instance 0
+   database-mapping 10.11.11.96/27 locator-set RLOCS
+  end
+sh ip lisp 1 map-cache 
+show lisp 1 database
+~~~
+
+~~~
+!@UTM-JP
+conf t
+ router lisp 1
+  ipv4 itr
+  ipv4 etr
+  ipv4 itr map-resolver 208.8.8.13
+  ipv4 etr map-server 208.8.8.13 key C1sc0123
+  locator-table default
+  locator-set RLOCS
+   ipv4-interface g1 priority 100 weight 100
+  !
+  eid-table default instance 0
+   database-mapping 10.21.21.208/28 locator-set RLOCS
+  end
+sh ip lisp 1 map-cache 
+show lisp 1 database
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Advertise MapResolver LAN
+
+~~~
+!@UTM-US / HQ
+conf t
+ router lisp 1
+  ipv4 itr
+  ipv4 etr
+  locator-set RLOCS
+   ipv4-int g1 priority 100 weight 100
+  !
+  eid-table default instance 0
+   database-mapping 10.0.0.0/30 locator-set RLOCS 
+   end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Expand Database Mapping
+
+~~~
+!@UTM-PH
+conf t
+ int lo1
+  ip add 10.11.1.1 255.255.255.0
+ int lo2
+  ip add 10.11.2.1 255.255.255.240
+ int lo3
+  ip add 10.11.3.1 255.255.255.224
+  end
+~~~
+
+
+<br>
+
+
+~~~
+!@UTM-PH,UTM-JP,UTM-US
+conf t
+ no router lisp 1
+ end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# FHRP
+
+### Setup 
+
+CSR1000v:
+  Name: R1 UTM-PH
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet3 |
+
+
+CSR1000v:
+  Name: R2 UTM-JP
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet3 |
+
+
+CSR1000v:
+  Name: R3 UTM-US
+  
+  | NetAdapter   |        |
+  | ---          | ---    |
+  | NetAdapter   | NAT    |
+  | NetAdapter 2 | VMNet2 |
+  | NetAdapter 3 | VMNet3 |
+  
+
+TinyCore (yvm.ova):
+  Name: P1 BLDG-PH
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet3             |
+
+
+TinyCore (yvm.ova):
+  Name: P2 BLDG-JP
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet3             |
+  
+
+TinyCore (yvm.ova):
+  Name: P3 BLDG-US
+  
+  | NetAdapter   |                    |
+  | ---          | ---                |
+  | NetAdapter   | VMNet3             |
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### PRECONFIGS
+
+~~~
+!@UTM-PH  R1
+conf t
+ hostname UTM-PH--R1
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G2
+ ip name-server 192.168.102.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.11 255.255.255.0
+  ip nat outside
+  no shut
+ int g2
+  ip add 192.168.102.11 255.255.255.0
+  ip nat inside
+  no shut
+ int g3
+  ip add 192.168.103.11 255.255.255.0
+  ip nat inside
+  no shut
+ !
+ ip access-list extended NAT
+  permit ip 192.168.102.0 0.0.0.255 any
+  permit ip 192.168.103.0 0.0.0.255 any
+ !
+ ip nat inside source list NAT int g1 overload
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@UTM-JP  R2
+conf t
+ hostname UTM-JP--R2
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G2
+ ip name-server 192.168.102.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.12 255.255.255.0
+  ip nat outside
+  no shut
+ int g2
+  ip add 192.168.102.12 255.255.255.0
+   ip nat inside
+  no shut
+ int g3
+  ip add 192.168.103.12 255.255.255.0
+  ip nat inside
+  no shut
+ !
+ ip access-list extended NAT
+  permit ip 192.168.102.0 0.0.0.255 any
+  permit ip 192.168.103.0 0.0.0.255 any
+ !
+ ip nat inside source list NAT int g1 overload
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@UTM-US  R3
+conf t
+ hostname UTM-US--R3
+ enable secret pass
+ service password-encryption
+ no logging cons
+ ip domain lookup
+ ip domain lookup source-interface G2
+ ip name-server 192.168.102.8
+ line vty 0 14
+  transport input all
+  password pass
+  login local
+  exec-timeout 0 0
+ int g1
+  ip add 208.8.8.13 255.255.255.0
+  ip nat outside
+  no shut
+ int g2
+  ip add 192.168.102.13 255.255.255.0
+  ip nat inside
+  no shut
+ int g3
+  ip add 192.168.103.13 255.255.255.0
+  ip nat inside
+  no shut
+ !
+ ip access-list extended NAT
+  permit ip 192.168.102.0 0.0.0.255 any
+  permit ip 192.168.103.0 0.0.0.255 any
+ !
+ ip nat inside source list NAT int g1 overload
+ !
+ username admin privilege 15 secret pass
+ ip http server
+ ip http secure-server
+ ip http authentication local
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ end
+wr
+!
+~~~
+
+<br>
+
+~~~
+!@BLDG-PH
+sudo su
+hostname BLDG-PH--PC1
+ifconfig eth0 192.168.103.101 netmask 255.255.255.0 up
+route add default gw 192.168.103.11
+ping 192.168.103.11
+~~~
+
+<br>
+
+~~~
+!@BLDG-JP
+sudo su
+hostname BLDG-JP--PC2
+ifconfig eth0 192.168.103.102 netmask 255.255.255.0 up
+route add default gw 192.168.103.12
+ping 192.168.103.12
+~~~
+
+<br>
+
+~~~
+!@BLDG-US
+sudo su
+hostname BLDG-US--PC3
+ifconfig eth0 192.168.103.103 netmask 255.255.255.0 up
+route add default gw 192.168.103.13
+ping 192.168.103.13
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+## HSRP
+
+~~~
+!@R1 (PRIMARY INTERNET)
+conf t
+ track 1 int gi 1 line-protocol
+ !
+ int gi 3
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 120
+  standby 10 track 1 decrement 60
+  end
+show standby
+~~~
+
+~~~
+!@R2 (BACKUP)
+conf t
+ track 1 int gi 1 line-protocol
+ !
+ int gi 3
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 110
+  standby 10 track 1 decrement 60
+  end
+show standby
+~~~
+
+~~~
+!@R3 (BACKUP of BACKUP / Last Resort)
+conf t
+ int gi 3
+  standby 10 ip 192.168.103.69
+  standby 10 priority 100
+  end
+show standby
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### HSRPv1 vs HSRPv2
+
+~~~
+!@R1 (PRIMARY INTERNET)
+conf t
+ track 1 int gi 1 line-protocol
+ !
+ int gi 3
+  no standby 10
+  standby version 2
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 120
+  standby 10 track 1 decrement 60
+  end
+show standby
+~~~
+
+~~~
+!@R2 (BACKUP)
+conf t
+ track 1 int gi 1 line-protocol
+ !
+ int gi 3
+  no standby 10
+  standby version 2
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 110
+  standby 10 track 1 decrement 60
+  end
+show standby
+~~~
+
+~~~
+!@R3 (BACKUP of BACKUP / Last Resort)
+conf t
+ int gi 3
+  no standby 10
+  standby version 2
+  standby 10 ip 192.168.103.69
+  standby 10 priority 100
+  end
+show standby
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### VRRP
+
+~~~
+!@R1 (PRIMARY INTERNET)
+conf t
+ track 2 int gi 1 line-protocol
+ !
+ int gi 3
+  no standby 10
+  vrrp 10 ip 192.168.103.69
+  vrrp 10 preempt
+  vrrp 10 priority 120
+  vrrp 10 track 1 decrement 60
+  end
+show vrrp
+~~~
+
+~~~
+!@R2 (BACKUP)
+conf t
+ track 1 int gi 1 line-protocol
+ !
+ int gi 3
+  no standby 10
+  vrrp 10 ip 192.168.103.69
+  vrrp 10 preempt
+  vrrp 10 priority 110
+  vrrp 10 track 1 decrement 60
+  end
+show vrrp
+~~~
+
+~~~
+!@R3 (BACKUP of BACKUP / Last Resort)
+conf t
+ int gi 3
+  no standby 10
+  vrrp 10 ip 192.168.103.69
+  vrrp 10 priority 100
+  end
+show vrrp
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### GLBP
+
+~~~
+!@R1 (PRIMARY INTERNET)  AVG
+conf t
+ track 3 int gi 1 line-protocol
+ !
+ int gi 3
+  no vrrp 10
+  glbp 10 ip 192.168.103.69
+  glbp 10 preempt
+  glbp 10 priority 120
+  glbp 10 load-balancing round-robin
+  glbp 10 weighting 120 lower 70 upper 100
+  glbp 10 weighting track 3 decrement 60
+  end
+show glbp
+~~~
+
+~~~
+!@R2 (BACKUP)    AVF
+conf t
+ track 3 int gi 1 line-protocol
+ !
+ int gi 3
+  no vrrp 10
+  glbp 10 ip 192.168.103.69
+  glbp 10 preempt
+  glbp 10 priority 110
+  glbp 10 load-balancing round-robin
+  glbp 10 weighting 120 lower 70 upper 100
+  glbp 10 weighting track 3 decrement 60
+  end
+show glbp
+~~~
+
+~~~
+!@R3 (BACKUP of BACKUP / Last Resort)  AVF
+conf t
+ int gi 3
+  no vrrp 10
+  glbp 10 ip 192.168.103.69
+  glbp 10 preempt
+  glbp 10 priority 109
+  glbp 10 load-balancing round-robin
+  glbp 10 weighting 120 lower 70 upper 100
+  end
+show glbp
+~~~
+
+
+<br>
+<br>
+
+
+
+Verify Load Balancing:
+~~~
+!@PC1 - BLDG-PH
+sudo su
+route delete default gw 192.168.103.11
+route add default gw 192.168.103.69
+ping 8.8.8.8
+~~~
+
+~~~
+!@PC2 - BLDG-JP
+sudo su
+route delete default gw 192.168.103.12
+route add default gw 192.168.103.69
+ping 8.8.8.8
+~~~
+
+~~~
+!@PC3 - BLDG-US
+sudo su
+route delete default gw 192.168.103.13
+route add default gw 192.168.103.69
+ping 8.8.8.8
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# FHRP with IP SLA
+
+__Using HSRP__
+~~~
+!@R1 (PRIMARY INTERNET)
+conf t
+ int gi 3
+  no glbp 10 ip 192.168.103.69
+  no glbp 10 priority 120
+  no glbp 10 preempt
+  no glbp 10 weighting
+  no glbp 10 weighting track 3
+  no standby 10
+  !
+  standby version 2
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 120
+  !
+ no track 1
+ no track 2
+ no track 3
+  end
+show standby
+~~~
+
+~~~
+!@R2 (BACKUP)
+conf t
+ int gi 3
+  no glbp 10 ip 192.168.103.69
+  no glbp 10 priority 120
+  no glbp 10 preempt
+  no glbp 10 weighting
+  no glbp 10 weighting track 3
+  no standby 10
+  !
+  standby version 2
+  standby 10 ip 192.168.103.69
+  standby 10 preempt
+  standby 10 priority 110
+  !
+ no track 1
+ no track 2
+ no track 3
+ end
+show standby
+~~~
+
+~~~
+!@R3 (PRETEND INTERNET ACCESS)
+conf t
+ int gi 3
+  shutdown
+  !
+  no glbp 10 ip 192.168.103.69
+  no glbp 10 priority 120
+  no glbp 10 preempt
+  no glbp 10 weighting
+  no glbp 10 weighting track 3
+  no standby 10
+  !
+  no track 1
+  no track 2
+  no track 3
+  end
+~~~
+
+
+&nbsp;
+---
+&nbsp;
+
+
+__IP SLA__
+~~~
+!@R1
+conf t
+ no ip sla 1
+ ip sla 1
+  icmp-echo 208.8.8.13
+  frequency 5
+ ip sla schedule 1 life forever start-time now
+ !
+ no track 4 ip sla 1 reachability
+ track 4 ip sla 1 reachability
+  delay down 10 up 5           
+ !
+ int g3
+  standby 10 track 4 decrement 60
+  end
+show ip sla statistics
+~~~
+
+
+&nbsp;
+---
+&nbsp;
+
+
+__Turn Off IP SLA__
+~~~
+!@R1,R2,R3
+conf t
+ no ip sla 1
+ no ip sla 2
+ no track 1
+ no track 2
+ no track 3
+ no track 4
+ end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# Quality of Service
+*Why need QoS? Periodic Congestion*
+
+
+1. __Best Effort__ - Not Strict. (FiFo) First come first serve traffic management.
+
+<br>
+
+2. __DiffServ__ - Less Strict. Bandwidth Guarantee for each application and share bandwidth with other apps depending on when they need it.
+
+<br>
+
+3. __IntServ__ - Strict. Bandwidth Guarantee for each app but does not share with other apps even if a certain app is not using bandwidth.
+
+
+&nbsp;
+---
+&nbsp;
+
+
+### L2 802.1q Frame
+1. Tag Protocol Identifier  
+2. Tag Control Information  
+   - Priority Code Point (CoS)  
+   - Drop Eligible Indicator  
+   - VLAN Identifier  
+
+__Class of Service__
+| Bin | Value | Use         |
+| --- | ---   | ---         |
+| 000 | 0     | Data BE     |
+| 001 | 1     |             |
+| 010 | 2     |             |
+| 011 | 3     | Signal      |
+| 100 | 4     | Video       |
+| 101 | 5     | Voice       |
+| 110 | 6     |             |
+| 111 | 7     | Net Control |
+
+
+&nbsp;
+---
+&nbsp;
+
+
+### L3 IPv4 Header
+1. Version
+2. Internet Header Length
+3. Type of Service (DSCP 6b & ECN 2b)  [8 bits]
+4. Total Length
+5. Identification Field
+6. Flags
+7. Fragment Offset
+8. Time to Live
+9. Protocol
+10. Header Checksum
+11. Source Address
+12. Destination Address
+13. IP Options
+14. Payload
+
+
+&nbsp;
+---
+&nbsp;
+
+
+### DSCP IDs
+
+__IP PRECEDENCE__
+| Bin | Value | Use                  |
+| --- | ---   | ---                  |
+| 000 | 0     | Routine              |
+| 001 | 1     | Priority             |
+| 010 | 2     | Immediate            |
+| 011 | 3     | Flash                |
+| 100 | 4     | Flash Override       |
+| 101 | 5     | CRITIC/ECP           |
+| 110 | 6     | Internetwork Control |
+| 111 | 7     | Network Control      |
+
+
+<br>
+
+
+__DSCP__
+| #   | Name                       | Decimal | Binary  |
+| --- | ---                        | ---     | ---     |
+| 1   | Default                    | 0       | 00 0000 |
+| 2   | Expedited Forwarding (EF)  | 46      | 10 1110 |
+| 3   | Class Selector 1 (CS1)     | 8	     | 00 1000 |
+| 4   | Class Selector 2 (CS2)     | 16	     | 01 0000 |
+| 5   | Class Selector 3 (CS3)     | 24	     | 01 1000 |
+| 6   | Class Selector 4 (CS4)	   | 32	     | 10 0000 |
+| 7   | Class Selector 5 (CS5)     | 40      | 10 1000 |
+| 8   | Class Selector 6 (CS6)     | 48      | 11 0000 |
+| 9   | Class Selector 7 (CS7)     | 56	     | 11 1000 |
+
+<br>
+<br>
+
+| #   | Low Drop Probability   | Medium Drop Probability   | High Drop Probability  |
+| --- | ---                    | ---                       | ---                    |
+| 1   | AF11(10) 001 01_0      | AF12(12) 001 10_0         | AF13(14) 001 11_0      |
+| 2   | AF21(18) 010 01_0      | AF22(20) 010 10_0         | AF23(22) 010 11_0      |
+| 3   | AF31(26) 011 01_0      | AF32(28) 011 10_0         | AF33(30) 011 11_0      |
+| 4   | AF41(34) 100 01_0      | AF42(36) 100 10_0         | AF43(38) 100 11_0      |
+
+
+<br>
+<br>
+
+__Highest___
+
+  | ---  | ---  | ---                    |
+  | CS7  | 56   |  Network Control       |
+  | CS6  | 48   |  Routing               |
+  | EF   | 46   |  Voice                 |
+  | CS5  | 40   |                        |
+  | AF41 | 34   |                        |
+  | AF42 | 36   |                        |
+  | AF43 | 38   |                        |
+  | CS4  | 32   |                        |
+  | AF31 | 26   |                        |
+  | AF32 | 28   |                        |
+  | AF33 | 30   |                        |
+  | CS3  | 24   |                        |
+  | AF21 | 18   |                        |
+  | AF22 | 20   |                        |
+  | AF23 | 22   |                        |
+  | CS2  | 16   |                        |
+  | AF11 | 10   |                        |
+  | AF12 | 12   |                        |
+  | AF13 | 14   |                        |
+  | CS1  | 8    |      Scavenger         |
+  | CS0  | 0    |  Best Effort (default) |
+
+__Lowest__
+
+<br>
+<br>
+
+---
+&nbsp;
+
+### QOS Mechanisms
+1. Classification & Marking
+2. Congestion Avoidance
+   - RED & WRED [THRESHOLD]
+3. Queuing
+   - Priority (LLQ)
+   - Bandwidth (CBWFQ)
+   - fair-queue (WFQ)
+4. Shaping & Policing
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Classification & Marking
+*Wireshark Filter:   ip.dsfield.dscp == 18*
+
+| BLDG  | IP            | DSCP   |
+| ---   | ---           | ---    |
+| 1     | 8.8.8.8       | AF21   |
+| 2     | 1.1.1.1       | CS3    |
+| 3     | 8.8.4.4       | AF41   |
+
+<br>
+
+~~~
+!@R1
+conf t
+ ip access-list extended ACL-8
+  permit ip host 192.168.103.101 host 8.8.8.8
+ ip access-list extended ACL-1
+  permit ip host 192.168.103.102 host 1.1.1.1
+ ip access-list extended ACL-84
+  permit ip host 192.168.103.103 host 8.8.4.4
+ !
+ class-map match-any CM-8
+  match access-group name ACL-8
+ class-map match-any CM-1
+  match access-group name ACL-1
+ class-map match-any CM-84
+  match access-group name ACL-84
+ !
+ policy-map PM1
+  class CM-8
+   set dscp AF21
+  class CM-1
+   set dscp CS3
+  class CM-84
+   set dscp 41
+  class class-default
+   set dscp default
+ int g3
+  service-policy input PM1
+  end
+show policy-map int g3
+~~~
+
+
+~~~
+!@R1
+conf t
+ int g3
+  no service-policy input PM1
+  end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# Control Plane Policing
+
+~~~
+!@cmd
+ping 208.8.8.11 -t -l 65500
+~~~
+
+### Prevent ICMP Overload
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Exercise: Rate-Limit Remote connections
+
+~~~
+!@R1
+config t
+ ip access-list extended TELNET
+  permit tcp any any eq 23
+  exit
+ ip access-list extended SSH
+  permit tcp any any eq 22
+  exit
+ ip access-list extended ICMP
+  permit icmp any any
+  exit
+ class-map match-all CM-TEL
+  match access-group name TELNET
+  exit
+ class-map match-all CM-SSH
+  match access-group name SSH
+  exit
+ class-map match-all CM-ICMP
+  match access-group name ICMP
+  exit
+ policy-map PM-COPP
+  class CM-TEL
+   police 8000 conform-action drop exceed-action drop
+  class CM-SSH
+   police 500000 conform-action transmit exceed-action transmit
+  class CM-ICMP
+   police 16000 conform-action transmit exceed-action drop
+  class class-default
+   police 12000 conform-action transmit exceed-action transmit
+   exit
+ control-plane
+  service-policy input PM-COPP
+  end
+~~~
+
+
+~~~
+!@R1
+conf t
+ control-plane
+  no service-policy input PM-COPP
+  end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Lab Question:
+
+A network is configured with CoPP to protect the CORE router route processor for stability and DDoS protection.
+As a company, a class named class-default is preconfigured and must not be modified or deleted.
+
+Troubleshoot CoPP to resolve the issues introduced during the maintenance window to ensure that:
+
+1. Dynamic routing policies are under CoPP-CRITICAL are allowed only from the 10.10.x.x range.
+
+2. Telnet, SSH, and ping are under CoPP-IMPORTANT are allowed strictly to/from 10.10.x.x to the CORE router (Hint: you can verify using Loopback1).
+
+3. All devices ping (UDP) any CORE router interface successfully to/from the 10.10.x.x range and do not allow any other IP address.
+   NORMAL (Hint: Traceroute port range 33434 33464)
+
+
+~~~
+!@CORE
+conf t
+ hostname CORE
+ no logging cons
+ no ip domain lookup
+ line cons 0 
+  exec-timeout 0 0
+ int lo0
+  ip add 10.10.1.1 255.255.255.255
+ int e0/0
+  ip add 10.10.12.1 255.255.255.0
+  no shut
+ int e0/1
+  ip add 10.10.13.1 255.255.255.0
+  no shut
+ router eigrp 101
+  network 10.10.1.1 0.0.0.0
+  network 10.10.12.0 0.0.0.255
+  network 10.10.13.0 0.0.0.255
+  eigrp router-id 10.10.1.1
+  
+ class-map match-all CoPP-CRITICAL
+  match access-group 120
+ class-map match-all CoPP-NORMAL
+  match access-group 122
+ class-map match-all CoPP-IMPORTANT
+  match access-group 121
+ policy-map CoPP
+  class CoPP-CRITICAL
+   police 1000000 50000 50000 conform-action transmit exceed-action drop
+  class CoPP-IMPORTANT
+   police 100000 20000 20000 conform-action transmit exceed-action drop
+  class CoPP-NORMAL
+   police 64000 6400 64000 conform-action transmit exceed-action drop
+  class class-default
+   police 8000 1500 1500 conform-action drop exceed-action drop
+ access-list 120 remark *** ACL for CoPP-CRITICAL ***
+ access-list 121 remark *** ACL for CoPP-IMPORTANT ***
+ access-list 122 remark *** ACL for CoPP-NORMAL ***
+ control-plane
+  service-policy input CoPP
+  end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# Logging & Monitoring
+
+### Setup
+
+__IR-ElasticSys__
+| NetAdapter | VMNet   |
+| ---        | ---     |
+| 1          | NAT     |
+| 2          | VMNet 2 |
+
+
+__CSR1000v / R1__
+| NetAdapter | VMNet   |
+| ---        | ---     |
+| 1          | NAT     |
+| 2          | VMNet 2 |
+| 3          | VMNet 3 |
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+## Set the correct Time (REAL WORLD USE NTP)
+~~~
+!@IR-ElasticSys
+timedatectl set-timezone UTC
+timedatectl set-timezone Asia/Kuala_Lumpur
+date
+~~~
+
+
+~~~
+!@R1
+conf t
+ int g1
+  ip add 208.8.8.11 255.255.255.0 
+  no shut
+ ip route 0.0.0.0 0.0.0.0 208.8.8.2
+ ip name-server 8.8.8.8   1.1.1.1
+ !
+ int g2
+  ip add 192.168.102.11 255.255.255.0
+  no shut
+ int g3
+  ip add 192.168.103.11 255.255.255.0
+  no shut
+ !
+ ntp server 216.239.35.12
+ clock timezone PHT 8
+ end
+show clock
+show ntp associations
+sh ntp status
+show clock
+~~~
+
+
+&nbsp;
+---
+&nbsp;
+
+
+### 1. Turn On ElasticSearch
+~~~
+!@IR-ElasticSys
+systemctl start elasticsearch
+~~~
+
+Verification
+~~~
+systemctl status elasticsearch
+ss -ulnp | grep 2055
+~~~
+
+- Elastic Search MUST be running
+- Filebeat MUST be listening on port 2055 for netflow traffic
+
+
+<br>
+<br>
+
+
+### 2. Access ElasticSearch GUI
+
+http://208.8.8.133:5601
+- Username: admin
+- Password: C1sc0123
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+### Network Monitoring: Syslogs
+
+Log Severity Levels
+
+| Level | Severity      | Description                       |
+| ---   | ---           | ---                               |
+| 0     | Emergency     | System is unusable                |
+| 1     | Alert         | Immediate action required         |
+| 2     | Critical      | Critical conditions               |
+| 3     | Error         | Error conditions                  | 
+| 4     | Warning       | Warning conditions                |
+| 5     | Notice        | Normal but significant conditions |
+| 6     | Informational | Informational messages            | 
+| 7     | Debug         | Debugging messages                |
+
+
+
+
+<br>
+
+__Track Logins__
+~~~
+!@R4
+conf t
+ username admin priv 15 secret pass
+ ip domain name SYSLOG.COM
+ crypto key generate rsa modulus 2048 
+ ip ssh version 2
+ !
+ line vty 0 4
+  transport input all
+  login local
+  login on-success log
+  login on-failure log
+  end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+## Time-Based ACL
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# Netflow
+1. RECORD
+2. EXPORTER
+3. MONITOR
+
+4. INTERFACE
+
+
+
+### Configure NetFlow on Cisco
+~~~
+!@R1
+conf t
+ no flow record FLOW_RECORD
+ flow record FLOW_RECORD                  
+  match ipv4 source address
+  match ipv4 destination address
+  match transport source-port
+  match transport destination-port
+  match ipv4 protocol
+  match ipv4 version
+  match interface input
+  match interface output
+  collect counter bytes
+  collect counter packets
+  collect transport tcp flags
+  collect flow direction
+  collect timestamp absolute first
+  collect timestamp absolute last
+  !
+  collect ipv4 tos
+  collect ipv4 ttl
+  collect routing next-hop address ipv4
+  collect application name
+  collect routing source as
+  collect routing destination as
+ !
+ no flow exporter FLOW_EXPORTER
+ flow exporter FLOW_EXPORTER              
+  destination 192.168.102.133
+  transport udp 2055
+  template data timeout 60                
+  option interface-table timeout 60        
+  option exporter-stats timeout 60         
+ !
+ no flow monitor FLOW_MONITOR
+ flow monitor FLOW_MONITOR                
+  exporter FLOW_EXPORTER
+  record FLOW_RECORD
+ !
+ interface GigabitEthernet1
+  ip flow monitor FLOW_MONITOR input      
+  ip flow monitor FLOW_MONITOR output
+  end
+~~~
+
+
+<br>
+<br>
+
+
+### Generate Packets to be converted to Flows
+
+Telnet OR SSH via 208.8.8.11
+ - Username: admin
+ - Password: pass
+
+~~~
+!@R1
+telnet www.rivanit.com  2000  /ipv4
+telnet www.rivanit.com  5060  /ipv4
+telnet www.cisco.com  53  /ipv4
+telnet www.neu.edu.ph  80  /ipv4
+telnet www.neu.edu.ph  443  /ipv4
+~~~
+
+
+<br>
+<br>
+
+
+### Ex. NTOPNG
+
+~~~
+!@R2
+config t
+ flow record NETFLOW-RECORD
+ 
+ 
+ 
+ 
+ flow exporter NETFLOW-EXPORTER
+ 
+ 
+ 
+ 
+ flow monitor NETFLOW-MONITOR
+ 
+ 
+
+  end
+~~~
+
+
+<br>
+<br>
+
+---
+&nbsp;
+
+
+# WAN 
+
+
 ## OSPF
 - Configure loopback 0 on both C1 & C2 with 1.1.1.1 & 2.2.2.2 respectively
 - Advertise RouteReflector Connected & Loopback 1 IP only
@@ -163,8 +1774,16 @@ conf t
 show int | inc BW
 ~~~
 
+~~~
+100_000_000 mbps
+/
+100_00
+-----------------
+10_000 * 3
 
-
+Answer: 30_000
+OSPF Cost caps at 65_536
+~~~
 
 Answer: 30_000
 OSPF Cost caps at 65_536
@@ -232,41 +1851,41 @@ conf t
 ### Route Summarization & Filtering
 
 ~~~
-!@RR
+!@C1
 conf t
  int lo10
   ip add 100.8.1.1 255.255.255.0
-  ip ospf 1 area 12
+  ip ospf 1 area 100
  int lo11
   ip add 100.8.10.1 255.255.255.252
-  ip ospf 1 area 12
+  ip ospf 1 area 100
  int lo12
   ip add 100.8.14.1 255.255.252.0
-  ip ospf 1 area 12
+  ip ospf 1 area 100
  int lo13
   ip add 100.8.35.1 255.255.224.0
-  ip ospf 1 area 12
+  ip ospf 1 area 100
  int lo14
   ip add 200.8.72.1 255.255.255.0
-  ip ospf 1 area 12
+  ip ospf 1 area 200
  int lo15
   ip add 200.8.80.1 255.255.255.0
-  ip ospf 1 area 12
+  ip ospf 1 area 200
  int lo16
   ip add 200.8.99.1 255.255.255.0
-  ip ospf 1 area 12
+  ip ospf 1 area 200
  int lo17
   ip add 210.8.1.1 255.255.255.252
-  ip ospf 1 area 12
+  ip ospf 1 area 210
  int lo18
   ip add 210.8.12.1 255.255.248.0
-  ip ospf 1 area 12
+  ip ospf 1 area 210
  int lo19
   ip add 210.8.35.1 255.255.224.0
-  ip ospf 1 area 12
+  ip ospf 1 area 210
  int lo20
   ip add 210.8.65.1 255.255.192.0
-  ip ospf 1 area 12
+  ip ospf 1 area 210
  !
  router ospf 1
   passive-interface lo10
@@ -317,7 +1936,7 @@ __Step 4__: Decide an i that will summarize all digits within the octet.
 <br>
 
 ~~~
-!@RR
+!@C1
 conf t
  router ospf 1
   area 100 range 100.8.0.0 255.255.192.0
@@ -337,7 +1956,7 @@ conf t
 <br>
 
 ~~~
-!@RR
+!@C1
 conf t
  router ospf 1
   area 200 range 200.8.64.0 255.255.192.0
@@ -352,7 +1971,7 @@ conf t
 3. Filter routes with 210.x.x.x from entering area 0
 
 ~~~
-!@RR
+!@C1
 conf t
  ip prefix-list BLOCK_210 seq 5 deny 210.8.1.0/17 le 32
  ip prefix-list BLOCK_210 seq 10 PERMIT 0.0.0.0/0 le 32
@@ -370,15 +1989,7 @@ conf t
 
 
 
-### OSPF LSA & Area Types
-
-| Area Type     | LSA       |
-| ---           | ---       |
-| Normal        | 1,2,3,4,5 |
-| Stub          | 1,2,3     |
-| Totally Stub  | 1,2       |
-| Not So Stubby | 1,2,3,7   |
-|
+### OSPF LSA & Area Types (LSU > LSA)
 
 <br>
 
@@ -389,6 +2000,7 @@ conf t
  router ospf 1
  area 12 stub no-summary
  end
+sh ip ospf neigh
 ~~~
 
 ~~~
@@ -397,6 +2009,8 @@ conf t
  router ospf 1
   area 12 stub
   end
+sh ip ospf neigh
+sh ip route
 ~~~
 
 <br>
@@ -406,10 +2020,10 @@ __NOT SO STUBBY__
 !@C1,C2
 conf t
  router ospf 1
-  area 1 nssa
-  area 2 nssa
-  area 3 nssa
-  area 4 nssa
+  area 1 nssa 
+  area 2 nssa 
+  area 3 nssa 
+  area 4 nssa 
   end
 ~~~
 
@@ -446,27 +2060,11 @@ conf t
 ~~~
 
 
+<br>
+<br>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+---
+&nbsp;
 
 
 ### OSPF Network Types & Interface Priority
@@ -512,35 +2110,20 @@ yes
 
 ### Keychain Authentication  [HMAC-SHA-256]
 
-~~~
-!@All MPLS Devices
-conf t
- key chain MPLS-KEYS
-  key 1
-   key-string C1sc0123
-   cryptographic-algorithm hmac-sha-256
-   end
-~~~
 
-<br>
 
-~~~
-!@C1,C2
-conf t
- int range e0/1-2
-  ip ospf authentication key-chain MPLS-KEYS
-  end
-~~~
 
-<br>
 
-~~~
-!@PE-1,PE-2,PE-3,PE-4
-conf t
- int e0/0
-  ip ospf authentication key-chain MPLS-KEYS
-  end
-~~~
+
+
+
+
+
+
+
+
+
+
 
 
 <br>
@@ -555,26 +2138,44 @@ conf t
 ~~~
 !@MPLS Devices
 conf t
+ ip cef
+ mpls ip
  router ospf 1
   mpls ldp auto
   end
 show mpls ldp neigh
 ~~~
 
-
-Why did the RouteReflector fail to configure ldp?
+<br>
 
 ~~~
-!@RR
-show mpls ldp discovery detail
+!@C1,C2
+conf t
+ mpls ldp router-id lo0 force
+ int range e0/0-3
+  mpls mtu override 1512
+  end
 ~~~
+
+<br>
 
 ~~~
 !@RR
 conf t
- mpls ldp router-id lo1 force
- end
-show mpls ldp neigh
+ int range e0/1-2
+  mpls mtu override 1512
+  end
+~~~
+
+<br>
+
+~~~
+!@PE-1,PE-2,PE-3,PE-4
+conf t
+ mpls ldp router-id lo0 force
+ int range e0/0
+  mpls mtu override 1512
+  end
 ~~~
 
 
@@ -591,50 +2192,22 @@ BGP
 - 6 bit ASN
 - 4 byte ASN
 
-~~~
-!@RR
-conf t
- router bgp 2.42000
-  bgp log-neighbor-changes
-  no synchronization
-  no bgp default ipv4-unicast
-  template peer-session TEMP-PEER
-   remote-as 2.42000
-   update-source lo1
-  exit
-  template peer-policy TEMP-POL
-   send-community extended
-   route-reflector-client
-   end
-~~~
-
-~~~
-!@PE-1,PE-2,PE-3,PE-4
-conf t
- router bgp 2.42000
-  bgp log-neighbor-changes
-  no synchronization
-  no bgp default ipv4-unicast
-  template peer-session TEMP-PEER
-   remote-as 2.42000
-   update-source lo0
-  exit
-  template peer-policy TEMP-POL
-   send-community extended
-   route-reflector-client
-   end
-~~~
-
-
-<br>
-<br>
-
-
 Establish VPNv4 Peering between RR & PE Routers
 ~~~
 !@RR
 conf t
  router bgp 2.42000
+  bgp log-neighbor-changes
+  no synchronization
+  no bgp default ipv4-unicast
+  template peer-session TEMP-PEER
+   remote-as 2.42000
+   update-source loopback1
+  exit
+  template peer-policy TEMP-POL
+   send-community extended
+   route-reflector-client
+  !
   neighbor 172.16.8.1 inherit peer-session TEMP-PEER
   neighbor 172.16.8.2 inherit peer-session TEMP-PEER
   neighbor 172.16.8.3 inherit peer-session TEMP-PEER
@@ -655,6 +2228,17 @@ conf t
 !@PE-1,PE-2,PE-3,PE-4
 conf t
  router bgp 2.42000
+  bgp log-neighbor-changes
+  no synchronization
+  no bgp default ipv4-unicast
+  template peer-session TEMP-PEER
+   remote-as 2.42000
+   update-source loopback0
+  exit
+  template peer-policy TEMP-POL
+   send-community extended
+   route-reflector-client
+  !
   neighbor 10.8.101.8 inherit peer-session TEMP-PEER
   address-family vpnv4
    neighbor 10.8.101.8 activate
@@ -673,6 +2257,7 @@ sh bgp vpnv4 unicast all summary
 
 ### VRF
 
+__CLASSIC VRF__
 ~~~
 !@PE-1,PE-2,PE-3,PE-4
 conf t
@@ -684,6 +2269,22 @@ conf t
   route-target both 200:1
   end
 ~~~
+
+<br>
+
+~~~
+!@PE-1
+conf t
+ int e0/1
+  ip vrf forwarding cust-a
+  ip add 10.1.1.2 255.255.255.252
+  no shut
+  end
+~~~
+
+
+<br>
+<br>
 
 
 __VRF DEFINITION__
@@ -701,19 +2302,8 @@ conf t
   end
 ~~~
 
-~~~
-!@PE-1
-conf t
- int e0/1
-  ip vrf forwarding cust-a
-  ip add 10.1.1.2 255.255.255.252
-  no shut
-  end
-~~~
-
 <br>
 
-__VRF DEFINITION__
 ~~~
 !@PE-1
 conf t
@@ -1043,16 +2633,18 @@ conf t
   collect application name
   collect routing source as
   collect routing destination as
+ !
  flow exporter FLOW-EXPORTER
-  destination 208.8.8.133
   transport udp 2055
   template data timeout 60
   option interface-table timeout 60
   option exporter-stats timeout 60
   export-protocol netflow-v9
+ !
  flow monitor FLOW-MONITOR
   record FLOW-RECORD
   exporter FLOW-EXPORTER
+ !
  interface range e0/0-3
   ip flow monitor FLOW-MONITOR input
   ip flow monitor FLOW-MONITOR output
@@ -1186,6 +2778,7 @@ conf t
   address-family ipv4
    network 82.2.2.0 mask 255.255.255.0
    end
+show ip route bgp
 ~~~
 
 
@@ -1913,17 +3506,6 @@ conf t
 
 
 
-
-
-
-TSHOOT
-~~~
-!@HQ-Z
-conf t
- int tunnel 100
-  tunnel destination 42.2.2.2
-  end
-~~~
 
 
 
