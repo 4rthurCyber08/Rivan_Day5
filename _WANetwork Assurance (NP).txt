@@ -1916,22 +1916,22 @@ conf t
 <br>
 
 __Step 1__: Determine the octet to summarize.
-100.8.__.0  (3rd, __)
+
 
 <br>
 
 __Step 2__: Subtract the difference between the highest and lowest digit from the octet.
-32 - 1 = 31
+
 
 <br>
 
 __Step 3__: Think of an i bigger than the subtracted value
-100.8.0.0   
+  
 
 <br>
 
 __Step 4__: Decide an i that will summarize all digits within the octet.
-100.8.0.0   (3rd, 64i)
+
 
 <br>
 
@@ -1939,7 +1939,7 @@ __Step 4__: Decide an i that will summarize all digits within the octet.
 !@C1
 conf t
  router ospf 1
-  area 100 range 100.8.0.0 255.255.192.0
+
   end
 ~~~
 
@@ -1959,7 +1959,7 @@ conf t
 !@C1
 conf t
  router ospf 1
-  area 200 range 200.8.64.0 255.255.192.0
+
   end
 ~~~
 
@@ -1986,7 +1986,6 @@ conf t
 
 ---
 &nbsp;
-
 
 
 ### OSPF LSA & Area Types (LSU > LSA)
@@ -2833,9 +2832,6 @@ Troubleshoot BGP
 ~~~
 !@I3
 conf t
- int e0/2
-  ip add 82.2.8.3 255.255.255.0
-  no shut
  router bgp 30
   no neighbor 82.2.2.1 remote-as 2
   neighbor 82.2.8.1 remote-as 2
@@ -2847,9 +2843,6 @@ clear ip bgp *   !- BGP Router ID is old
 ~~~
 !@B-B1
 conf t
- int e0/1
-  ip add 82.2.8.1 255.255.255.0
-  no shut
  router bgp 2
   no neighbor 82.2.2.3 remote-as 30
   neighbor 82.2.8.3 remote-as 30
